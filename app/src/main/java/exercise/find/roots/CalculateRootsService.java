@@ -4,8 +4,10 @@ import android.app.IntentService;
 import android.content.Intent;
 import android.util.Log;
 
+
 public class CalculateRootsService extends IntentService {
 
+  private final long MAX_TIME = 20000;
 
   public CalculateRootsService() {
     super("CalculateRootsService");
@@ -20,26 +22,38 @@ public class CalculateRootsService extends IntentService {
       Log.e("CalculateRootsService", "can't calculate roots for non-positive input" + numberToCalculateRootsFor);
       return;
     }
-    /*
-    TODO:
-     calculate the roots.
-     check the time (using `System.currentTimeMillis()`) and stop calculations if can't find an answer after 20 seconds
-     upon success (found a root, or found that the input number is prime):
-      send broadcast with action "found_roots" and with extras:
-       - "original_number"(long)
-       - "root1"(long)
-       - "root2"(long)
-     upon failure (giving up after 20 seconds without an answer):
-      send broadcast with action "stopped_calculations" and with extras:
-       - "original_number"(long)
-       - "time_until_give_up_seconds"(long) the time we tried calculating
 
-      examples:
-       for input "33", roots are (3, 11)
-       for input "30", roots can be (3, 10) or (2, 15) or other options
-       for input "17", roots are (17, 1)
-       for input "829851628752296034247307144300617649465159", after 20 seconds give up
+    long root1, root2;
+    root1 = calculateRoots(numberToCalculateRootsFor,timeStartMs);
+    long timeTook = System.currentTimeMillis() - timeStartMs;
+    root2 = numberToCalculateRootsFor / root1;
+    Intent broadcastIntent = new Intent("found_roots");
+    broadcastIntent.putExtra("original_number", numberToCalculateRootsFor);
+    broadcastIntent.putExtra("root1", root1);
+    broadcastIntent.putExtra("root2", root2);
+    broadcastIntent.putExtra("time", timeTook);
+    sendBroadcast(broadcastIntent);
+  }
 
-     */
+  long calculateRoots(long numberToCalculateRootsFor ,long timeStartMs){
+    boolean is_prime = true;
+    long i = 2;
+    while (i < (numberToCalculateRootsFor/2)){
+      if ((System.currentTimeMillis() - timeStartMs) > MAX_TIME){
+        Intent broadcastIntent = new Intent("stopped_calculations");
+        broadcastIntent.putExtra("original_number", numberToCalculateRootsFor);
+        broadcastIntent.putExtra("time_until_give_up_seconds", MAX_TIME);
+        sendBroadcast(broadcastIntent);
+      }
+      if ((numberToCalculateRootsFor % i) == 0){
+        is_prime = false;
+        break;
+      }
+      i++;
+    }
+    if (is_prime){
+      return 1;
+    }
+    return i;
   }
 }

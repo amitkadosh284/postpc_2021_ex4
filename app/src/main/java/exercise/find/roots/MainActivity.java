@@ -11,14 +11,19 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.util.regex.Pattern;
+
 public class MainActivity extends AppCompatActivity {
 
   private BroadcastReceiver broadcastReceiverForSuccess = null;
-  // TODO: add any other fields to the activity as you want
+  private BroadcastReceiver broadcastReceiverForFail = null;
+  private boolean waitForResult = false;
 
 
   @Override
@@ -38,12 +43,19 @@ public class MainActivity extends AppCompatActivity {
 
     // set listener on the input written by the keyboard to the edit-text
     editTextUserInput.addTextChangedListener(new TextWatcher() {
-      public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-      public void onTextChanged(CharSequence s, int start, int before, int count) { }
+      public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+      }
+
+      public void onTextChanged(CharSequence s, int start, int before, int count) {
+      }
+
       public void afterTextChanged(Editable s) {
         // text did change
         String newText = editTextUserInput.getText().toString();
         // todo: check conditions to decide if button should be enabled/disabled (see spec below)
+        if (checkValidityUserText(newText) && (!waitForResult)) {
+          buttonCalculateRoots.setEnabled(true);
+        }
       }
     });
 
@@ -51,29 +63,63 @@ public class MainActivity extends AppCompatActivity {
     buttonCalculateRoots.setOnClickListener(v -> {
       Intent intentToOpenService = new Intent(MainActivity.this, CalculateRootsService.class);
       String userInputString = editTextUserInput.getText().toString();
-      // todo: check that `userInputString` is a number. handle bad input. convert `userInputString` to long
-      long userInputLong = 0; // todo this should be the converted string from the user
+      long userInputLong = Long.parseLong(userInputString);
       intentToOpenService.putExtra("number_for_service", userInputLong);
       startService(intentToOpenService);
-      // todo: set views states according to the spec (below)
+      waitForResult = true;
+
+      // set views states for progress
+      progressBar.setVisibility(View.VISIBLE);
+      editTextUserInput.setEnabled(false);
+      buttonCalculateRoots.setEnabled(false);
     });
 
     // register a broadcast-receiver to handle action "found_roots"
     broadcastReceiverForSuccess = new BroadcastReceiver() {
       @Override
       public void onReceive(Context context, Intent incomingIntent) {
-        if (incomingIntent == null || !incomingIntent.getAction().equals("found_roots")) return;
-        // success finding roots!
-        /*
-         TODO: handle "roots-found" as defined in the spec (below).
-          also:
-           - the service found roots and passed them to you in the `incomingIntent`. extract them.
-           - when creating an intent to open the new-activity, pass the roots as extras to the new-activity intent
-             (see for example how did we pass an extra when starting the calculation-service)
-         */
+        if (incomingIntent == null || !incomingIntent.getAction().equals("found_roots")) {
+          return;
+        }
+
+        //set state for a new input
+        waitForResult = false;
+        progressBar.setVisibility(View.GONE); // hide progress
+        editTextUserInput.setText(""); // cleanup text in edit-text
+        editTextUserInput.setEnabled(true); // set edit-text as enabled (user can input text)
+        buttonCalculateRoots.setEnabled(false); // set button as disabled (user can't click)
+
+        // crate intent to success activity and send all the information from calculation
+        Intent intentForSuccess = new Intent(this, SuccessActivity);
+        intentForSuccess.putExtra("original_number",
+                incomingIntent.getLongExtra("original_number", 0));
+        intentForSuccess.putExtra("root1",
+                incomingIntent.getLongExtra("root1", 0));
+        intentForSuccess.putExtra("root2",
+                incomingIntent.getLongExtra("root2", 0));
+        intentForSuccess.putExtra("time",
+                incomingIntent.getLongExtra("time", 0));
+
+        startActivity(intentForSuccess);
       }
     };
+
     registerReceiver(broadcastReceiverForSuccess, new IntentFilter("found_roots"));
+
+    broadcastReceiverForFail = new BroadcastReceiver() {
+      @Override
+      public void onReceive(Context context, Intent incomingIntent) {
+        if (incomingIntent == null || !incomingIntent.getAction().equals("stopped_calculations")) {
+          return;
+        }
+
+        long time = incomingIntent.getLongExtra("time", 0);
+        String toastText = "calculation aborted after " + time + " seconds";
+        Toast.makeText(context, toastText, Toast.LENGTH_SHORT).show();
+      }
+    };
+
+    registerReceiver(broadcastReceiverForFail, new IntentFilter("stopped_calculations"));
 
     /*
     todo:
@@ -83,24 +129,67 @@ public class MainActivity extends AppCompatActivity {
      */
   }
 
-  @Override
-  protected void onDestroy() {
-    super.onDestroy();
-    // todo: remove ALL broadcast receivers we registered earlier in onCreate().
-    //  to remove a registered receiver, call method `this.unregisterReceiver(<receiver-to-remove>)`
-  }
+  /**
+   * function that check if the user text is positive valid long number
+   * @param newText - the user input text
+   * @return true- if it is valid input. false otherwise.
+   */
+    private boolean checkValidityUserText (String newText){
+      try {
+        long num = Long.parseLong(newText);
+        return num >= 0;
+      } catch (NumberFormatException exception) {
+        return false;
+      }
+    }
 
-  @Override
-  protected void onSaveInstanceState(@NonNull Bundle outState) {
-    super.onSaveInstanceState(outState);
-    // TODO: put relevant data into bundle as you see fit
-  }
+    @Override
+    protected void onDestroy () {
+      super.onDestroy();
 
-  @Override
-  protected void onRestoreInstanceState(@NonNull Bundle savedInstanceState) {
-    super.onRestoreInstanceState(savedInstanceState);
-    // TODO: load data from bundle and set screen state (see spec below)
-  }
+      this.unregisterReceiver(broadcastReceiverForFail);
+      this.unregisterReceiver(broadcastReceiverForSuccess);
+    }
+
+    @Override
+    protected void onSaveInstanceState (@NonNull Bundle outState){
+      super.onSaveInstanceState(outState);
+
+      EditText editTextUserInput = findViewById(R.id.editTextInputNumber);
+
+      // insert data to bundle
+      outState.putBoolean("waitForResult", waitForResult);
+      outState.putString("userInput", String.valueOf(editTextUserInput.getText()));
+    }
+
+    @Override
+    protected void onRestoreInstanceState (@NonNull Bundle savedInstanceState){
+      super.onRestoreInstanceState(savedInstanceState);
+
+      // load the old data from the bundle
+      waitForResult = savedInstanceState.getBoolean("waitForResult");
+      String input = savedInstanceState.getString("userInput");
+
+      // finding all views
+      ProgressBar progressBar = findViewById(R.id.progressBar);
+      EditText editTextUserInput = findViewById(R.id.editTextInputNumber);
+      Button buttonCalculateRoots = findViewById(R.id.buttonCalculateRoots);
+
+      // insert the input was before
+      editTextUserInput.setText(input);
+
+      // sets all states according if it wait for calculate or not
+      if (waitForResult){
+        editTextUserInput.setEnabled(false);
+        buttonCalculateRoots.setEnabled(false);
+        progressBar.setVisibility(View.VISIBLE);
+      }
+      else{
+        editTextUserInput.setEnabled(true);
+        buttonCalculateRoots.setEnabled(true);
+        progressBar.setVisibility(View.GONE);
+      }
+    }
 }
 
 
