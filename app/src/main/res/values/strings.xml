@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">FindRoots</string>
+    <string name="the_time_it_took_to_calculate_is">The time it took to calculate is:</string>
 </resources>

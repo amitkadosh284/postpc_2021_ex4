@@ -1,7 +1,9 @@
 package exercise.find.roots;
 
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 
 import junit.framework.TestCase;
 
@@ -10,6 +12,7 @@ import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
+
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 28)
@@ -45,8 +48,36 @@ public class MainActivityTest extends TestCase {
     EditText inputEditText = mainActivity.findViewById(R.id.editTextInputNumber);
     Button button = mainActivity.findViewById(R.id.buttonCalculateRoots);
 
-    // test: insert input to the edit text and verify that the button is enabled
-    // TODO: implement
+    inputEditText.setText("12");
+    assertTrue(button.isEnabled());
+  }
+
+  @Test
+  public void when_ActivityLunches_progress_should_hidden(){
+    // create a MainActivity and let it think it's currently displayed on the screen
+    MainActivity mainActivity = Robolectric.buildActivity(MainActivity.class).create().visible().get();
+
+    // find the edit-text and the button
+    ProgressBar progressBar = mainActivity.findViewById(R.id.progressBar);
+
+    assertEquals(progressBar.getVisibility(), View.GONE);
+  }
+
+  @Test
+  public void when_inserting_good_number_and_clickingButton_progress_should_be_shown(){
+    // create a MainActivity and let it think it's currently displayed on the screen
+    MainActivity mainActivity = Robolectric.buildActivity(MainActivity.class).create().visible().get();
+
+    // find the edit-text and the button
+    EditText inputEditText = mainActivity.findViewById(R.id.editTextInputNumber);
+    Button button = mainActivity.findViewById(R.id.buttonCalculateRoots);
+    ProgressBar progressBar = mainActivity.findViewById(R.id.progressBar);
+
+
+    inputEditText.setText("12");
+    button.performClick();
+
+    assertEquals(progressBar.getVisibility(), View.VISIBLE);
   }
 
   // TODO: add 1 or 2 more unit tests to the activity. so your "writing tests" skill won't get rusty.

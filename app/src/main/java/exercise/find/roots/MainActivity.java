@@ -63,15 +63,20 @@ public class MainActivity extends AppCompatActivity {
     buttonCalculateRoots.setOnClickListener(v -> {
       Intent intentToOpenService = new Intent(MainActivity.this, CalculateRootsService.class);
       String userInputString = editTextUserInput.getText().toString();
-      long userInputLong = Long.parseLong(userInputString);
-      intentToOpenService.putExtra("number_for_service", userInputLong);
-      startService(intentToOpenService);
-      waitForResult = true;
+      try {
+        long userInputLong = Long.parseLong(userInputString);
+        intentToOpenService.putExtra("number_for_service", userInputLong);
+        startService(intentToOpenService);
+        waitForResult = true;
 
-      // set views states for progress
-      progressBar.setVisibility(View.VISIBLE);
-      editTextUserInput.setEnabled(false);
-      buttonCalculateRoots.setEnabled(false);
+        // set views states for progress
+        progressBar.setVisibility(View.VISIBLE);
+        editTextUserInput.setEnabled(false);
+        buttonCalculateRoots.setEnabled(false);
+
+      } catch (NumberFormatException e){
+        buttonCalculateRoots.setEnabled(false);
+      }
     });
 
     // register a broadcast-receiver to handle action "found_roots"
@@ -90,7 +95,7 @@ public class MainActivity extends AppCompatActivity {
         buttonCalculateRoots.setEnabled(false); // set button as disabled (user can't click)
 
         // crate intent to success activity and send all the information from calculation
-        Intent intentForSuccess = new Intent(this, SuccessActivity);
+        Intent intentForSuccess = new Intent(context, SuccessActivity.class);
         intentForSuccess.putExtra("original_number",
                 incomingIntent.getLongExtra("original_number", 0));
         intentForSuccess.putExtra("root1",
@@ -113,20 +118,13 @@ public class MainActivity extends AppCompatActivity {
           return;
         }
 
-        long time = incomingIntent.getLongExtra("time", 0);
+        long time = incomingIntent.getLongExtra("time_until_give_up_seconds", 0);
         String toastText = "calculation aborted after " + time + " seconds";
         Toast.makeText(context, toastText, Toast.LENGTH_SHORT).show();
       }
     };
 
     registerReceiver(broadcastReceiverForFail, new IntentFilter("stopped_calculations"));
-
-    /*
-    todo:
-     add a broadcast-receiver to listen for abort-calculating as defined in the spec (below)
-     to show a Toast, use this code:
-     `Toast.makeText(this, "text goes here", Toast.LENGTH_SHORT).show()`
-     */
   }
 
   /**
@@ -135,6 +133,9 @@ public class MainActivity extends AppCompatActivity {
    * @return true- if it is valid input. false otherwise.
    */
     private boolean checkValidityUserText (String newText){
+      if((newText.length() > 0) && (newText.charAt(0) == '-')){
+        return false;
+      }
       try {
         long num = Long.parseLong(newText);
         return num >= 0;
